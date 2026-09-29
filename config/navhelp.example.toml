@@ -1,0 +1,25 @@
+# Example configuration for navhelp.
+# Copy to navhelp.toml (git-ignored) and adjust. Use it with:  navhelp <command> --config navhelp.toml
+# Command-line options override values from this file.
+
+[discovery]
+# Folders that are searched recursively for *.chm files.
+roots = ["C:\\Program Files (x86)\\Navitaire"]
+
+# Folders to skip, written RELATIVE to each root (case-insensitive).
+# ConfigCaptain and NavitaireTE contain no product help relevant to this tool.
+exclude = ["ConfigCaptain", "NavitaireTE"]
+
+# Symbolic links and NTFS junctions are never followed unless this is true.
+follow_links = false
+
+[conversion]
+# Where converted collections are written. Must be outside any Git working
+# tree, or in a git-ignored folder (for example .\knowledge in this repo).
+output = "~\\NavitaireHelp"
+
+# Optional explicit path to 7z.exe. When empty, the default install path and PATH are used.
+seven_zip = ""
+
+# Convert CHM files whose product could not be identified.
+include_unknown = false

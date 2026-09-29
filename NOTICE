@@ -1,0 +1,22 @@
+navitaire-help-exporter
+Copyright (c) 2026 SergioG977
+
+This project contains code derived from "chm-converter"
+(https://github.com/DTDucas/chm-converter), Copyright (c) 2025 Duong Tran Quang
+(DTDucas), distributed under the MIT License. Contributions to that project by
+Jiangxumin (encoding detection, cross-platform 7-Zip detection) are included in
+the derived parts.
+
+Derived parts (adapted and modified):
+  - src/navitaire_help/encoding.py        (encoding detection)
+  - src/navitaire_help/extraction.py      (7-Zip discovery and invocation)
+  - src/navitaire_help/markdown.py        (table normalisation, generic Markdown
+                                           cleanup, code block preservation)
+
+All other code, the discovery/classification/versioning design and the
+documentation are original to this project.
+
+This repository does NOT contain, and must never contain, Navitaire or Amadeus
+help files (.chm), converted documentation, installation metadata or any other
+proprietary content. The tool processes those files locally on the user's
+machine only.

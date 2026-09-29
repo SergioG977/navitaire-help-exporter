@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "navitaire-help-exporter"
+version = "0.1.0"
+description = "Discover installed Navitaire (New Skies, GoNow, GSS, Device Manager) CHM help files, identify product and version, and convert them to structured Markdown."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "SergioG977" }]
+dependencies = [
+    "beautifulsoup4==4.15.0",
+    "html2text==2025.4.15",
+    "chardet==7.4.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "ruff==0.16.9",
+]
+
+[project.scripts]
+navhelp = "navitaire_help.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 125
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = ["S603", "S607"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S108", "E501"]
