@@ -1,85 +1,85 @@
-# Guía: agentes especialistas y orquestador para la ayuda Navitaire
+# Guide: specialist agents and orchestrator for Navitaire help
 
-Esta guía explica cómo usar, adaptar y crear agentes de [Kiro](https://kiro.dev) que investigan la ayuda Navitaire convertida con `navhelp`. El repositorio ya incluye siete especialistas y un orquestador en `.kiro/agents/`.
+This guide explains how to use, adapt and create [Kiro](https://kiro.dev) agents that research the Navitaire help converted with `navhelp`. The repository already includes seven specialists and one orchestrator in `.kiro/agents/`.
 
-## 1. Cómo funciona
+## 1. How it works
 
 ```text
                   ┌──────────────────────────────┐
-  pregunta  ───▶  │ navitaire-help-orchestrator  │  lee knowledge/catalog.md, decide producto y versión
+  question  ───▶  │ navitaire-help-orchestrator  │  reads knowledge/catalog.md, decides product and version
                   └──────────────┬───────────────┘
-            delega (en paralelo si son dominios independientes)
+            delegates (in parallel when domains are independent)
    ┌──────────┬──────────┬───────┴──┬──────────┬──────────┬──────────┐
    ▼          ▼          ▼          ▼          ▼          ▼          ▼
  gonow    skyspeed   skyfare  skyschedule  newskies     gss    device-manager
    │          │          │          │          │          │          │
-   └──── cada uno busca solo en ./knowledge/<su familia>/ y devuelve respuesta + citas ────┘
+   └──── each searches only ./knowledge/<its family>/ and returns an answer + citations ────┘
                   ▼
-     respuesta consolidada, por producto y versión, con evidencia y vacíos
+     consolidated answer, by product and version, with evidence and gaps
 ```
 
-Principios:
+Principles:
 
-- **Un corpus por especialista.** Cada agente solo indexa su familia, así no mezcla productos.
-- **Versiones separadas.** Cada colección (`<familia>/<hash>/`) corresponde a una ayuda distinta; `catalog.md` dice qué versiones instaladas cubre. Los agentes deben declarar qué colección usan.
-- **Evidencia obligatoria.** Toda afirmación lleva la ruta del tema citado; lo que no está documentado se declara como vacío.
-- **Mínimo privilegio.** Los especialistas solo pueden leer y buscar. Escritura, comandos, web y MCP están denegados. El orquestador solo puede leer el catálogo y delegar en los agentes `navitaire-*`.
+- **One corpus per specialist.** Each agent indexes only its own family, so products are never mixed.
+- **Versions kept apart.** Each collection (`<family>/<hash>/`) is one distinct help file; `catalog.md` says which installed versions it covers. Agents must state which collection they used.
+- **Evidence required.** Every statement carries the path of the cited topic; anything undocumented is reported as a gap.
+- **Least privilege.** Specialists can only read and search. Writing, commands, web and MCP are denied. The orchestrator can only read the catalog and delegate to `navitaire-*` agents.
 
-## 2. Requisitos
+## 2. Prerequisites
 
-1. Kiro IDE instalado.
-2. `navhelp` instalado (ver [README](../README.md)).
-3. La ayuda convertida **dentro de la carpeta ignorada `knowledge`** del repositorio:
+1. Kiro IDE installed.
+2. `navhelp` installed (see the [README](../README.md)).
+3. The converted help **inside the git-ignored `knowledge` folder** of the repository:
 
    ```powershell
    navhelp convert --output .\knowledge --validate
    ```
 
-   `knowledge/` está en `.gitignore` y el control de seguridad bloquea cualquier intento de publicarla.
+   `knowledge/` is in `.gitignore`, and the safety check blocks any attempt to publish it.
 
-## 3. Agentes incluidos
+## 3. Included agents
 
-| Agente | Familias que indexa | Dominio |
+| Agent | Families indexed | Domain |
 | --- | --- | --- |
-| `navitaire-gonow` | `gonow` | Check-in, embarque, equipaje, control de salidas |
-| `navitaire-skyspeed` | `skyspeed` | Reservas, ventas, pagos, servicio al pasajero |
-| `navitaire-skyfare` | `skyfare` | Tarifas, reglas tarifarias, mercados, precios |
-| `navitaire-skyschedule` | `skyschedule` | Horarios, tramos, temporadas, rutas, aeronaves |
-| `navitaire-newskies` | `newskies-management-console`, `ncs-rules`, `ncs-currency`, `ncs-notification` | Configuración, roles, permisos, datos de referencia y plug-ins |
-| `navitaire-gss` | `gss-management-console` | APIS/APPS, reglas y mensajería gubernamental |
-| `navitaire-device-manager` | `device-manager` | Periféricos, escáneres, impresoras, logs |
-| `navitaire-help-orchestrator` | (ninguna; lee `catalog.md`) | Enrutamiento y consolidación |
+| `navitaire-gonow` | `gonow` | Check-in, boarding, baggage, departure control |
+| `navitaire-skyspeed` | `skyspeed` | Reservations, sales, payments, passenger servicing |
+| `navitaire-skyfare` | `skyfare` | Fares, fare rules, markets, pricing |
+| `navitaire-skyschedule` | `skyschedule` | Schedules, legs, seasons, routes, aircraft |
+| `navitaire-newskies` | `newskies-management-console`, `ncs-rules`, `ncs-currency`, `ncs-notification` | Configuration, roles, permissions, reference data and plug-ins |
+| `navitaire-gss` | `gss-management-console` | APIS/APPS, rules and government messaging |
+| `navitaire-device-manager` | `device-manager` | Peripherals, scanners, printers, logs |
+| `navitaire-help-orchestrator` | (none; reads `catalog.md`) | Routing and consolidation |
 
-## 4. Uso
+## 4. Usage
 
-1. Abre la carpeta del repositorio en Kiro. Los agentes de `.kiro/agents/` se cargan para ese workspace.
-2. Selecciona el agente en el chat (o menciónalo) y pregunta. Ejemplos:
-   - Orquestador: *"En la versión más reciente de New Skies, ¿qué permiso necesita un agente de aeropuerto para una operación en GoNow y dónde se configura?"*
-   - Especialista: *"GoNow <versión>: ¿cómo se realiza <procedimiento>?"*
-3. Revisa las citas: cada ruta apunta a un archivo en `knowledge/` que puedes abrir para comprobarlo.
+1. Open the repository folder in Kiro. The agents in `.kiro/agents/` are loaded for that workspace.
+2. Select the agent in chat (or mention it) and ask. Examples:
+   - Orchestrator: *"In the latest New Skies version, which permission does an airport agent need for an operation in GoNow, and where is it configured?"*
+   - Specialist: *"GoNow <version>: how do I perform <procedure>?"*
+3. Check the citations: each path points to a file in `knowledge/` that you can open to verify.
 
-Tras volver a convertir (nueva instalación o nueva versión), actualiza las bases de conocimiento desde el panel de Kiro o reinicia la sesión: están configuradas con `autoUpdate: false` para que el índice solo cambie cuando tú lo decidas.
+After re-converting (new installation or new version), refresh the knowledge bases from the Kiro panel or restart the session: they are configured with `autoUpdate: false` so the index only changes when you decide.
 
-## 5. Anatomía de un especialista
+## 5. Anatomy of a specialist
 
-Los agentes son archivos Markdown: configuración YAML en el *front matter* y el prompt del sistema en el cuerpo. Campos usados:
+Agents are Markdown files: YAML configuration in the front matter and the system prompt in the body. Fields used:
 
-| Campo | Uso en este proyecto |
+| Field | Use in this project |
 | --- | --- |
-| `name` | Identificador; debe empezar por `navitaire-` para que el orquestador pueda invocarlo. |
-| `description` | Qué cubre y cuándo usarlo. Kiro y el orquestador la usan para elegir el agente, así que sé concreto. |
-| `tools` | `read` y `knowledge`: leer archivos y buscar en la base indexada. |
-| `allowedTools` | Las mismas herramientas, preaprobadas (son de solo lectura). |
-| `includeMcpJson` / `includePowers` | `false`: el agente no hereda servidores MCP ni Powers del usuario. |
-| `resources` | `file://./knowledge/catalog.md` (se carga completo) y una `knowledgeBase` por familia (se indexa y se busca bajo demanda). |
-| `permissions.rules` | `deny` para `fs_write`, `shell`, `web_fetch`, `web_search` y `mcp`. En Kiro un `deny` siempre prevalece. |
+| `name` | Identifier; must start with `navitaire-` so the orchestrator can invoke it. |
+| `description` | What it covers and when to use it. Kiro and the orchestrator use it to choose the agent, so be specific. |
+| `tools` | `read` and `knowledge`: read files and search the indexed base. |
+| `allowedTools` | The same tools, pre-approved (they are read-only). |
+| `includeMcpJson` / `includePowers` | `false`: the agent does not inherit the user's MCP servers or Powers. |
+| `resources` | `file://./knowledge/catalog.md` (loaded in full) and one `knowledgeBase` per family (indexed and searched on demand). |
+| `permissions.rules` | `deny` for `fs_write`, `shell`, `web_fetch`, `web_search` and `mcp`. In Kiro a `deny` always wins. |
 
-Ejemplo mínimo:
+Minimal example:
 
 ```markdown
 ---
-name: navitaire-ejemplo
-description: Especialista documental de <Producto> (<temas>). Investiga solo ./knowledge/<familia> y cita cada afirmación.
+name: navitaire-example
+description: Documentation specialist for <Product> (<topics>). Researches only ./knowledge/<family> and cites every statement.
 tools: ["read", "knowledge"]
 allowedTools: ["read", "knowledge"]
 includeMcpJson: false
@@ -87,9 +87,9 @@ includePowers: false
 resources:
   - file://./knowledge/catalog.md
   - type: knowledgeBase
-    source: file://./knowledge/<familia>
-    name: EjemploHelp
-    description: Ayuda <familia> convertida por navhelp
+    source: file://./knowledge/<family>
+    name: ExampleHelp
+    description: <family> help converted by navhelp
     indexType: best
     autoUpdate: false
 permissions:
@@ -106,63 +106,63 @@ permissions:
       effect: deny
 ---
 
-Eres el especialista documental de <Producto>. Tu única fuente es ./knowledge/<familia>/.
-1. Identifica la versión; si no se indica, usa la más alta del catálogo y dilo.
-2. Busca solo en esa colección y lee los temas completos.
-3. Responde con: respuesta, evidencia (ruta, título, sección), versión, inferencias y vacíos.
-No inventes comportamiento, no modifiques archivos, no ejecutes comandos.
+You are the documentation specialist for <Product>. Your only source is ./knowledge/<family>/.
+1. Identify the version; if none is given, use the highest in the catalog and say so.
+2. Search only that collection and read topics in full.
+3. Answer with: answer, evidence (path, title, section), version, inferences and gaps.
+Do not invent behaviour, do not modify files, do not run commands.
 ```
 
-Buenas prácticas para el prompt:
+Prompt best practices:
 
-- Exige separar **hechos** (citados) de **inferencias** (marcadas) y **vacíos**.
-- Indica qué temas pertenecen a otros productos para que el especialista los derive en lugar de improvisar.
-- Pide resúmenes con citas en lugar de copiar texto extenso de la documentación.
+- Require separating **facts** (cited) from **inferences** (flagged) and **gaps**.
+- State which topics belong to other products so the specialist hands them off instead of improvising.
+- Ask for summaries with citations rather than long copies of documentation text.
 
-## 6. Anatomía del orquestador
+## 6. Anatomy of the orchestrator
 
-| Campo | Valor |
+| Field | Value |
 | --- | --- |
-| `tools` | `read` (para el catálogo) y `subagent` (para delegar). |
-| `toolsSettings.subagent.availableAgents` | Lista explícita de los siete especialistas. El orquestador no puede lanzar ningún otro agente. |
-| `permissions.rules` | `allow` para `subagent` con `match: ["navitaire-*"]` (los especialistas son de solo lectura); `deny` para escritura, comandos, web y MCP. |
+| `tools` | `read` (for the catalog) and `subagent` (to delegate). |
+| `toolsSettings.subagent.availableAgents` | Explicit list of the seven specialists. The orchestrator cannot launch any other agent. |
+| `permissions.rules` | `allow` for `subagent` with `match: ["navitaire-*"]` (specialists are read-only); `deny` for writing, commands, web and MCP. |
 
-El prompt contiene la tabla de enrutamiento, el procedimiento (leer catálogo → decidir producto/versión → dividir solo si hay dominios independientes → planificar todas las delegaciones → consolidar) y el formato final. Kiro ejecuta los subagentes con contexto aislado y, si son independientes, en paralelo.
+The prompt contains the routing table, the procedure (read catalog → decide product/version → split only when domains are independent → plan all delegations → consolidate) and the final format. Kiro runs subagents with isolated context and, when independent, in parallel.
 
-Si prefieres aprobar cada delegación manualmente, cambia `effect: allow` por `effect: ask` en la regla `subagent`.
+If you prefer to approve each delegation manually, change `effect: allow` to `effect: ask` in the `subagent` rule.
 
-## 7. Añadir un producto nuevo
+## 7. Adding a new product
 
-1. Añade la familia en `src/navitaire_help/families.py` (y su prueba) y vuelve a convertir.
-2. Copia un especialista existente a `.kiro/agents/navitaire-<nombre>.md` y ajusta `name`, `description`, la `knowledgeBase` y el prompt.
-3. Añade el agente a `availableAgents` y a la tabla de enrutamiento del orquestador.
-4. Prueba (sección 8).
+1. Add the family in `src/navitaire_help/families.py` (with its test) and re-convert.
+2. Copy an existing specialist to `.kiro/agents/navitaire-<name>.md` and adjust `name`, `description`, the `knowledgeBase` and the prompt.
+3. Add the agent to `availableAgents` and to the orchestrator's routing table.
+4. Test it (section 8).
 
-## 8. Cómo probar los agentes
+## 8. Testing the agents
 
-Antes de confiar en ellos, verifica con preguntas de solo lectura:
+Before relying on them, verify with read-only questions:
 
-| Prueba | Resultado esperado |
+| Test | Expected result |
 | --- | --- |
-| Pregunta de un solo producto con versión | El orquestador delega en un único especialista; la respuesta cita temas de la colección de esa versión. |
-| Pregunta de dos productos | Delegación en dos especialistas; respuesta agrupada por producto. |
-| Pregunta sin versión | Se usa la versión más alta del catálogo y se declara. |
-| Pregunta de algo no documentado | Se responde que no hay evidencia; no se inventa. |
-| Pedirle que edite un archivo o ejecute un comando | Lo rechaza (permisos `deny`). |
-| Comparar dos versiones | Presenta cada versión por separado con sus citas. |
+| Single-product question with a version | The orchestrator delegates to one specialist; the answer cites topics from that version's collection. |
+| Two-product question | Delegation to two specialists; answer grouped by product. |
+| Question without a version | The highest version in the catalog is used and stated. |
+| Question about something undocumented | The answer says there is no evidence; nothing is invented. |
+| Asking it to edit a file or run a command | It refuses (`deny` permissions). |
+| Comparing two versions | Each version is presented separately with its citations. |
 
-Comprueba también que ninguna cita apunta fuera de `knowledge/` y que las rutas citadas existen.
+Also check that no citation points outside `knowledge/` and that the cited paths exist.
 
-## 9. Seguridad
+## 9. Security
 
-- La carpeta `knowledge/` contiene documentación propietaria: no la subas, no la compartas fuera de canales autorizados y no la adjuntes a incidencias.
-- No añadas `web`, `shell`, `write` ni servidores MCP a estos agentes salvo necesidad justificada; si lo haces, usa reglas `ask` en lugar de `allow`.
-- Evita `tools: ["*"]` y `trustedAgents`.
-- Revisa con cuidado cualquier *skill* o recurso de terceros que añadas: puede influir en el comportamiento del agente.
+- The `knowledge/` folder contains proprietary documentation: do not commit it, do not share it outside authorised channels, and do not attach it to issues.
+- Do not add `web`, `shell`, `write` or MCP servers to these agents unless justified; if you do, use `ask` rules instead of `allow`.
+- Avoid `tools: ["*"]` and `trustedAgents`.
+- Carefully review any third-party skill or resource you add: it can influence the agent's behaviour.
 
-## Referencias
+## References
 
-- Crear agentes personalizados: <https://kiro.dev/docs/custom-agents/creating/>
-- Referencia de configuración: <https://kiro.dev/docs/custom-agents/configuration-reference/>
-- Subagentes: <https://kiro.dev/docs/custom-agents/subagents/>
-- Permisos: <https://kiro.dev/docs/permissions/>
+- Creating custom agents: <https://kiro.dev/docs/custom-agents/creating/>
+- Configuration reference: <https://kiro.dev/docs/custom-agents/configuration-reference/>
+- Subagents: <https://kiro.dev/docs/custom-agents/subagents/>
+- Permissions: <https://kiro.dev/docs/permissions/>

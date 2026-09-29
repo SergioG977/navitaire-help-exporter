@@ -1,139 +1,139 @@
 # navitaire-help-exporter
 
-Herramienta de línea de comandos (`navhelp`) que **encuentra la ayuda CHM instalada con las aplicaciones Navitaire** (New Skies, GoNow, Government Security y Device Manager), **identifica a qué producto y versión pertenece cada archivo** y la **convierte a Markdown estructurado**, lista para leerla en cualquier editor o para usarla como base de conocimiento de agentes de IA.
+A command-line tool (`navhelp`) that **finds the CHM help installed with Navitaire applications** (New Skies, GoNow, Government Security and Device Manager), **identifies which product and version each file belongs to**, and **converts it to structured Markdown**, ready to read in any editor or to use as a knowledge base for AI agents.
 
-Todo el procesamiento es local. La herramienta no envía nada a Internet y este repositorio no contiene, ni debe contener nunca, documentación de Navitaire.
-
----
-
-## Índice
-
-1. [Qué problema resuelve](#qué-problema-resuelve)
-2. [Conceptos básicos](#conceptos-básicos)
-3. [Seguridad y confidencialidad](#seguridad-y-confidencialidad)
-4. [Requisitos](#requisitos)
-5. [Instalación paso a paso](#instalación-paso-a-paso)
-6. [Uso rápido](#uso-rápido)
-7. [Comandos en detalle](#comandos-en-detalle)
-8. [Configuración](#configuración)
-9. [Dónde busca y qué excluye](#dónde-busca-y-qué-excluye)
-10. [Productos reconocidos](#productos-reconocidos)
-11. [Cómo se identifica el producto](#cómo-se-identifica-el-producto)
-12. [Cómo se determina la versión](#cómo-se-determina-la-versión)
-13. [Estructura de la salida](#estructura-de-la-salida)
-14. [Uso con agentes de IA](#uso-con-agentes-de-ia)
-15. [Solución de problemas](#solución-de-problemas)
-16. [Desarrollo](#desarrollo)
-17. [Licencia y atribución](#licencia-y-atribución)
+All processing is local. The tool sends nothing to the Internet, and this repository does not contain, and must never contain, any Navitaire documentation.
 
 ---
 
-## Qué problema resuelve
+## Contents
 
-Las aplicaciones de escritorio de Navitaire incluyen su manual en archivos **CHM** (*Compiled HTML Help*, el formato de ayuda clásico de Windows que se abre con F1). Esos archivos:
+1. [What problem it solves](#what-problem-it-solves)
+2. [Key concepts](#key-concepts)
+3. [Security and confidentiality](#security-and-confidentiality)
+4. [Requirements](#requirements)
+5. [Step-by-step installation](#step-by-step-installation)
+6. [Quick start](#quick-start)
+7. [Commands in detail](#commands-in-detail)
+8. [Configuration](#configuration)
+9. [Where it searches and what it excludes](#where-it-searches-and-what-it-excludes)
+10. [Recognised products](#recognised-products)
+11. [How the product is identified](#how-the-product-is-identified)
+12. [How the version is determined](#how-the-version-is-determined)
+13. [Output structure](#output-structure)
+14. [Using it with AI agents](#using-it-with-ai-agents)
+15. [Troubleshooting](#troubleshooting)
+16. [Development](#development)
+17. [Licence and attribution](#licence-and-attribution)
 
-- están repartidos en decenas de carpetas de instalación, a menudo **duplicados** (la misma ayuda copiada en cada plug-in);
-- conviven en **varias versiones** del mismo producto (por ejemplo varias versiones de New Skies instaladas en paralelo);
-- tienen nombres que no siempre dicen de qué producto son ni qué versión documentan;
-- no se pueden buscar fácilmente, ni leer desde herramientas modernas o agentes de IA.
+---
 
-`navhelp` resuelve esto en cuatro pasos:
+## What problem it solves
 
-1. **Descubre** todos los `.chm` bajo `C:\Program Files (x86)\Navitaire` (excepto las carpetas excluidas).
-2. **Agrupa** los duplicados por contenido (hash SHA-256): cada ayuda distinta se procesa una sola vez.
-3. **Clasifica** cada ayuda (qué producto es) y **resuelve la versión instalada** a partir del registro de Windows y de los ejecutables, guardando siempre la evidencia usada.
-4. **Convierte** cada ayuda a una carpeta de Markdown con tabla de contenido, índice de palabras clave, imágenes, metadatos y diagnósticos, más un **catálogo** general.
+Navitaire desktop applications ship their manuals as **CHM** files (*Compiled HTML Help*, the classic Windows help format opened with F1). These files:
 
-## Conceptos básicos
+- are spread across dozens of installation folders, often **duplicated** (the same help copied into every plug-in);
+- exist in **several versions** of the same product side by side (for example, several New Skies versions installed in parallel);
+- have names that do not always say which product they belong to or which version they document;
+- are hard to search and cannot be read by modern tools or AI agents.
 
-| Término | Significado |
+`navhelp` solves this in four steps:
+
+1. **Discovers** every `.chm` under `C:\Program Files (x86)\Navitaire` (except excluded folders).
+2. **Groups** duplicates by content (SHA-256 hash): each distinct help file is processed only once.
+3. **Classifies** each help file (which product it is) and **resolves the installed version** from the Windows registry and the executables, always recording the evidence used.
+4. **Converts** each help file into a Markdown folder with a table of contents, keyword index, images, metadata and diagnostics, plus an overall **catalog**.
+
+## Key concepts
+
+| Term | Meaning |
 | --- | --- |
-| **Familia** (`family_id`) | Identificador estable del tipo de ayuda: `gonow`, `skyspeed`, `skyfare`… |
-| **Producto** | Nombre visible del producto: *GoNow*, *SkySpeed Reservation Manager*, *Fare Manager*… |
-| **Colección** | Una ayuda concreta, identificada por el hash de su contenido. Si dos versiones instaladas traen exactamente el mismo CHM, comparten colección. |
-| **Versión instalada** | Versión de la aplicación con la que está instalado el CHM (p. ej. `9.1.0.200`). Proviene del registro o del ejecutable. |
-| **Versión que indica la ayuda** | Versión mencionada dentro del propio texto de la ayuda. Se informa aparte porque a menudo no coincide con la instalada (la ayuda puede ser más antigua). |
-| **Evidencia** | Cada dato usado para clasificar o versionar (nombre de archivo, título interno, entrada de registro…). Se guarda en `manifest.json` para poder auditar el resultado. |
+| **Family** (`family_id`) | Stable identifier of the kind of help: `gonow`, `skyspeed`, `skyfare`… |
+| **Product** | Display name of the product: *GoNow*, *SkySpeed Reservation Manager*, *Fare Manager*… |
+| **Collection** | One specific help file, identified by the hash of its content. If two installed versions ship exactly the same CHM, they share a collection. |
+| **Installed version** | Version of the application the CHM is installed with (e.g. `9.1.0.200`). Comes from the registry or the executable. |
+| **Version stated by the help** | Version mentioned inside the help text itself. Reported separately because it often differs from the installed one (the help may be older). |
+| **Evidence** | Each piece of data used to classify or version (file name, internal title, registry entry…). Stored in `manifest.json` so the result can be audited. |
 
-## Seguridad y confidencialidad
+## Security and confidentiality
 
-La documentación de Navitaire es propiedad de Amadeus. La herramienta está diseñada para que no pueda filtrarse:
+Navitaire documentation is Amadeus property. The tool is designed so it cannot leak:
 
-- **Solo lectura** sobre las instalaciones: nunca escribe en `C:\Program Files (x86)\Navitaire` y rechaza una carpeta de salida dentro de las raíces de búsqueda.
-- **Sin red**: no hace llamadas a Internet, no tiene telemetría.
-- **La salida no puede acabar en Git por accidente**: `navhelp convert` se niega a escribir dentro de un repositorio Git salvo en una carpeta ignorada (por ejemplo `.\knowledge`, ya incluida en `.gitignore`).
-- **Rutas personales ocultas**: la carpeta de perfil (`C:\Users\<usuario>`) se sustituye por `~` en manifiestos y mensajes. Con `--hide-roots` también se ocultan las raíces.
-- **Sin correos internos**: se eliminan de los temas los enlaces `mailto:` de "Send Feedback".
-- **Control automático antes de publicar**: `scripts/check_repo_safety.py` bloquea archivos CHM/HHC/HHK/SAZ, ejecutables, Markdown convertido, rutas de perfil, tokens y claves. Se ejecuta en cada commit (hook) y en la integración continua.
-- **Extracción segura**: 7-Zip se invoca sin shell y se verifica que ningún archivo extraído quede fuera de la carpeta temporal. Los temporales se eliminan al terminar.
-- **Dependencias fijadas** a versiones exactas en `pyproject.toml`.
+- **Read-only** on installations: it never writes to `C:\Program Files (x86)\Navitaire` and rejects an output folder inside the search roots.
+- **No network**: no Internet calls, no telemetry.
+- **Output cannot end up in Git by accident**: `navhelp convert` refuses to write inside a Git repository unless the folder is git-ignored (for example `.\knowledge`, already in `.gitignore`).
+- **Personal paths hidden**: the profile folder (`C:\Users\<user>`) is replaced with `~` in manifests and messages. With `--hide-roots` the roots are hidden too.
+- **No internal e-mail addresses**: the `mailto:` "Send Feedback" links are removed from topics.
+- **Automatic check before publishing**: `scripts/check_repo_safety.py` blocks CHM/HHC/HHK/SAZ files, executables, converted Markdown, profile paths, tokens and keys. It runs on every commit (hook) and in continuous integration.
+- **Safe extraction**: 7-Zip is invoked without a shell, and no extracted file may land outside the temporary folder. Temporary files are deleted when done.
+- **Pinned dependencies**: exact versions in `pyproject.toml`.
 
-Reglas para quien use el repositorio:
+Rules for anyone using the repository:
 
-1. No subas nunca archivos `.chm`, carpetas de salida ni capturas de la documentación.
-2. Comparte la documentación convertida solo por los canales internos autorizados.
-3. Mantén el repositorio **privado** y da acceso únicamente a personal autorizado de Amadeus.
+1. Never commit `.chm` files, output folders or screenshots of the documentation.
+2. Share converted documentation only through authorised internal channels.
+3. Keep the repository **private** and grant access only to authorised Amadeus staff.
 
-## Requisitos
+## Requirements
 
-| Requisito | Detalle |
+| Requirement | Details |
 | --- | --- |
-| Windows 10/11 | La detección de versiones usa el registro y los recursos de versión de Windows. En otros sistemas funciona la conversión, pero la versión quedará como *inferida* o *desconocida*. |
-| Python 3.11 o superior | <https://www.python.org/downloads/> (marca *Add python.exe to PATH*). Comprueba con `py --version`. |
-| 7-Zip | <https://www.7-zip.org/>. Se busca en `C:\Program Files\7-Zip\7z.exe`, `C:\Program Files (x86)\7-Zip\7z.exe` y en el `PATH`. |
-| Git | Para clonar el repositorio. |
-| Permisos | Basta con lectura sobre `C:\Program Files (x86)\Navitaire`. No hace falta ser administrador. |
-| Espacio | Unos 150 MB para convertir todas las ayudas de una instalación típica. |
+| Windows 10/11 | Version detection uses the Windows registry and version resources. On other systems conversion works, but versions will be *inferred* or *unknown*. |
+| Python 3.11 or later | <https://www.python.org/downloads/> (tick *Add python.exe to PATH*). Check with `py --version`. |
+| 7-Zip | <https://www.7-zip.org/>. Looked up in `C:\Program Files\7-Zip\7z.exe`, `C:\Program Files (x86)\7-Zip\7z.exe` and on `PATH`. |
+| Git | To clone the repository. |
+| Permissions | Read access to `C:\Program Files (x86)\Navitaire` is enough. Administrator rights are not needed. |
+| Disk space | About 150 MB to convert all help files of a typical installation. |
 
-## Instalación paso a paso
+## Step-by-step installation
 
-Abre **PowerShell** y ejecuta:
+Open **PowerShell** and run:
 
 ```powershell
-# 1. Clonar (necesitas acceso al repositorio privado)
+# 1. Clone (you need access to the private repository)
 git clone https://github.com/SergioG977/navitaire-help-exporter.git
 Set-Location navitaire-help-exporter
 
-# 2. Crear un entorno virtual aislado
+# 2. Create an isolated virtual environment
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
-# Si PowerShell bloquea el script:  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+# If PowerShell blocks the script:  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
-# 3. Instalar la herramienta
+# 3. Install the tool
 python -m pip install --upgrade pip
 python -m pip install .
 
-# 4. Comprobar
+# 4. Check
 navhelp --version
 navhelp families
 ```
 
-Para contribuir al código instala además las herramientas de desarrollo y el hook de seguridad:
+To contribute code, also install the development tools and the safety hook:
 
 ```powershell
 python -m pip install -e ".[dev]"
 .\scripts\install-hooks.ps1
 ```
 
-Cada vez que abras una nueva ventana de PowerShell, activa el entorno con `.\.venv\Scripts\Activate.ps1` (o usa directamente `.\.venv\Scripts\navhelp.exe`).
+Each time you open a new PowerShell window, activate the environment with `.\.venv\Scripts\Activate.ps1` (or call `.\.venv\Scripts\navhelp.exe` directly).
 
-## Uso rápido
+## Quick start
 
 ```powershell
-# ¿Qué ayudas hay instaladas? (rápido, no extrae nada)
+# Which help files are installed? (fast, extracts nothing)
 navhelp scan
 
-# ¿De qué producto y versión es cada una?
+# Which product and version is each one?
 navhelp inspect
 
-# Convertir todo a Markdown en %USERPROFILE%\NavitaireHelp y validar el resultado
+# Convert everything to Markdown in %USERPROFILE%\NavitaireHelp and validate the result
 navhelp convert --validate
 
-# Abrir el catálogo generado
+# Open the generated catalog
 notepad "$HOME\NavitaireHelp\catalog.md"
 ```
 
-Ejemplo ilustrativo de salida de `navhelp inspect` (versiones ficticias):
+Illustrative output of `navhelp inspect` (fictitious versions):
 
 ```text
 FAMILY                         CLASS      INSTALLED VERSIONS           VERSION     HELP STATES FILE
@@ -143,64 +143,64 @@ skyspeed                       classified 9.3.0.200                    confirmed
 skyspeed                       classified 9.1.0.200, 9.2.0.200         confirmed   8.0.0       SkySpeedHelp.chm
 ```
 
-La última fila muestra por qué se separan colecciones y versiones: dos versiones instaladas pueden traer exactamente la misma ayuda, y el texto de esa ayuda puede mencionar una versión más antigua.
+The last row shows why collections and versions are kept apart: two installed versions can ship exactly the same help, and that help's text can mention an older version.
 
-## Comandos en detalle
+## Commands in detail
 
-Todos los comandos aceptan `--config ARCHIVO` y `-v/--verbose`. `navhelp <comando> --help` muestra la ayuda de cada uno.
+Every command accepts `--config FILE` and `-v/--verbose`. `navhelp <command> --help` shows the help for each one.
 
 ### `navhelp families`
 
-Lista las familias reconocidas, su producto y su dominio funcional.
+Lists the recognised families, their product and their functional domain.
 
 ### `navhelp scan`
 
-Busca archivos `.chm` sin abrirlos y muestra cuántos hay, cuántos son distintos y dónde está cada copia.
+Finds `.chm` files without opening them and shows how many there are, how many are distinct, and where each copy is.
 
-| Opción | Efecto |
+| Option | Effect |
 | --- | --- |
-| `--root DIR` | Carpeta raíz a recorrer (repetible). Sustituye a la raíz por defecto. |
-| `--exclude RUTA` | Carpeta adicional a omitir, relativa a la raíz (repetible). Ej.: `--exclude NewSkies\R4.8`. |
-| `--no-default-excludes` | No omitir `ConfigCaptain` ni `NavitaireTE`. |
-| `--chm ARCHIVO` | Procesar un CHM concreto en lugar de buscar (repetible). |
-| `--hide-roots` | Mostrar `<root>` en lugar de la ruta raíz. |
-| `--json` | Salida en JSON. |
+| `--root DIR` | Root folder to walk (repeatable). Replaces the default root. |
+| `--exclude PATH` | Extra folder to skip, relative to the root (repeatable). E.g. `--exclude NewSkies\R9.1`. |
+| `--no-default-excludes` | Do not skip `ConfigCaptain` and `NavitaireTE`. |
+| `--chm FILE` | Process a specific CHM instead of searching (repeatable). |
+| `--hide-roots` | Show `<root>` instead of the root path. |
+| `--json` | JSON output. |
 
 ### `navhelp inspect`
 
-Además de buscar, lee los metadatos internos de cada CHM (extracción parcial en una carpeta temporal) y muestra familia, estado de clasificación, versiones instaladas, estado de versión y versión mencionada en la ayuda. Con `-v` muestra toda la evidencia; con `--json` devuelve el manifiesto de cada colección.
+Besides searching, reads the internal metadata of each CHM (partial extraction into a temporary folder) and shows family, classification status, installed versions, version status and the version stated by the help. With `-v` it shows all the evidence; with `--json` it returns each collection's manifest.
 
 ### `navhelp convert`
 
-Convierte las ayudas encontradas. Acepta las opciones de `scan` y además:
+Converts the help files found. Accepts the `scan` options plus:
 
-| Opción | Efecto |
+| Option | Effect |
 | --- | --- |
-| `-o, --output DIR` | Carpeta de salida (por defecto `%USERPROFILE%\NavitaireHelp`). |
-| `--family ID` | Convertir solo esa familia (repetible). Ej.: `--family gonow --family skyspeed`. |
-| `--include-unknown` | Convertir también CHM no reconocidos (familia `unknown`). |
-| `--force` | Volver a convertir aunque la colección ya esté al día. |
-| `--validate` | Ejecutar `validate` al terminar. |
-| `--seven-zip EXE` | Ruta explícita a `7z.exe`. |
-| `--allow-unignored-output` | Permitir salida dentro de un repositorio Git no ignorada. **No recomendado.** |
+| `-o, --output DIR` | Output folder (default `%USERPROFILE%\NavitaireHelp`). |
+| `--family ID` | Convert only this family (repeatable). E.g. `--family gonow --family skyspeed`. |
+| `--include-unknown` | Also convert unrecognised CHM files (family `unknown`). |
+| `--force` | Re-convert even if the collection is already up to date. |
+| `--validate` | Run `validate` when finished. |
+| `--seven-zip EXE` | Explicit path to `7z.exe`. |
+| `--allow-unignored-output` | Allow output inside a Git repository folder that is not git-ignored. **Not recommended.** |
 
-La conversión es **incremental**: si una colección ya existe con la misma versión de la herramienta y las mismas versiones instaladas, se marca `unchanged` y solo se actualiza la lista de ubicaciones. Cada colección se escribe primero en una carpeta temporal `.<hash>.partial` y se publica al terminar, de modo que una interrupción nunca deja una colección a medias.
+Conversion is **incremental**: if a collection already exists with the same tool version and the same installed versions, it is reported as `unchanged` and only its list of locations is refreshed. Each collection is first written to a temporary `.<hash>.partial` folder and published at the end, so an interruption never leaves a half-written collection.
 
-### `navhelp validate [CARPETA]`
+### `navhelp validate [FOLDER]`
 
-Comprueba una carpeta de salida: manifiestos completos, número de temas correcto, front matter presente y coherente con su colección, catálogo consistente, ausencia de rutas de perfil de usuario. Informa como advertencias los enlaces rotos del origen y las versiones sin confirmar.
+Checks an output folder: complete manifests, correct topic count, front matter present and consistent with its collection, consistent catalog, and no user profile paths. Broken links in the source and unconfirmed versions are reported as warnings.
 
-### Códigos de salida
+### Exit codes
 
-| Código | Significado |
+| Code | Meaning |
 | --- | --- |
-| `0` | Correcto. |
-| `1` | Alguna ayuda falló o la validación encontró errores. |
-| `2` | Error de uso o de configuración (7-Zip no encontrado, salida insegura, archivo inexistente…). |
+| `0` | Success. |
+| `1` | A help file failed or validation found errors. |
+| `2` | Usage or configuration error (7-Zip not found, unsafe output, missing file…). |
 
-## Configuración
+## Configuration
 
-Los valores por defecto funcionan en una instalación estándar. Para cambiarlos, copia el ejemplo (el archivo `navhelp.toml` está ignorado por Git):
+The defaults work on a standard installation. To change them, copy the example (`navhelp.toml` is git-ignored):
 
 ```powershell
 Copy-Item config\navhelp.example.toml navhelp.toml
@@ -219,174 +219,174 @@ seven_zip = ""
 include_unknown = false
 ```
 
-Las opciones de línea de comandos tienen prioridad sobre el archivo. Se admiten `~` y variables de entorno (`%USERPROFILE%`).
+Command-line options take precedence over the file. `~` and environment variables (`%USERPROFILE%`) are supported.
 
-## Dónde busca y qué excluye
+## Where it searches and what it excludes
 
-- Raíz por defecto: `C:\Program Files (x86)\Navitaire`.
-- Se recorren **recursivamente todas las subcarpetas** (`GovernmentSecurity`, `NAV1`, `NewSkies` y cualquier otra que aparezca).
-- Se omiten por completo `ConfigCaptain` y `NavitaireTE` (comparación sin distinguir mayúsculas).
-- No se siguen enlaces simbólicos ni *junctions* de NTFS, para no salir de la raíz.
-- Las carpetas sin permiso de lectura se informan como advertencia y se continúa.
+- Default root: `C:\Program Files (x86)\Navitaire`.
+- **All subfolders are walked recursively** (`GovernmentSecurity`, `NAV1`, `NewSkies` and any other that appears).
+- `ConfigCaptain` and `NavitaireTE` are skipped entirely (case-insensitive comparison).
+- Symbolic links and NTFS junctions are not followed, so the walk never leaves the root.
+- Folders that cannot be read are reported as warnings and the walk continues.
 
-No hay rutas de instalación codificadas más allá de esta raíz: la herramienta encuentra los CHM dondequiera que estén bajo ella.
+No installation paths are hard-coded beyond this root: the tool finds CHM files wherever they are below it.
 
-## Productos reconocidos
+## Recognised products
 
-| Familia | Producto | Dominio | Archivo habitual |
+| Family | Product | Domain | Typical file |
 | --- | --- | --- | --- |
-| `gonow` | GoNow | Check-in, embarque, equipaje y control de salidas | `GoNow.chm` |
-| `skyspeed` | SkySpeed Reservation Manager | Reservas, ventas y servicio al pasajero | `SkySpeedHelp.chm` |
-| `skyfare` | Fare Manager | Tarifas, reglas tarifarias, mercados y precios | `SkyFareHelp.chm` |
-| `skyschedule` | Schedule Manager | Horarios, tramos, rutas y equipos | `SkyScheduleHelp.chm` |
-| `newskies-management-console` | New Skies Management Console | Configuración del sistema, roles, permisos y datos de referencia | `Navitaire.NewSkies.UI.Win.SkyManagerHelp.chm` |
-| `gss-management-console` | GSS Management Console | Government Security Services: APIS/APPS, reglas y mensajería gubernamental | `Navitaire.GovernmentSecurity.GSSManagementConsole.Help.chm` |
-| `device-manager` | Device Manager | Periféricos, escáneres, impresoras, simuladores y logs | `DeviceManager.chm` |
-| `ncs-rules` | Rules Management | Plug-in de reglas de Management Console | `Rules.chm` |
-| `ncs-currency` | Currency Management | Plug-in de monedas de Management Console | `Currency.chm` |
-| `ncs-notification` | Notification Management | Plug-in de notificaciones de Management Console | `Notification.chm` |
+| `gonow` | GoNow | Check-in, boarding, baggage and departure control | `GoNow.chm` |
+| `skyspeed` | SkySpeed Reservation Manager | Reservations, sales and passenger servicing | `SkySpeedHelp.chm` |
+| `skyfare` | Fare Manager | Fares, fare rules, markets and pricing | `SkyFareHelp.chm` |
+| `skyschedule` | Schedule Manager | Schedules, legs, routes and equipment | `SkyScheduleHelp.chm` |
+| `newskies-management-console` | New Skies Management Console | System configuration, roles, permissions and reference data | `Navitaire.NewSkies.UI.Win.SkyManagerHelp.chm` |
+| `gss-management-console` | GSS Management Console | Government Security Services: APIS/APPS, rules and government messaging | `Navitaire.GovernmentSecurity.GSSManagementConsole.Help.chm` |
+| `device-manager` | Device Manager | Peripherals, scanners, printers, simulators and logs | `DeviceManager.chm` |
+| `ncs-rules` | Rules Management | Management Console rules plug-in | `Rules.chm` |
+| `ncs-currency` | Currency Management | Management Console currency plug-in | `Currency.chm` |
+| `ncs-notification` | Notification Management | Management Console notification plug-in | `Notification.chm` |
 
-Para añadir una familia nueva, agrega una entrada en `src/navitaire_help/families.py` con sus patrones y una prueba en `tests/test_classification_versioning.py`.
+To add a new family, add an entry in `src/navitaire_help/families.py` with its patterns, and a test in `tests/test_classification_versioning.py`.
 
-## Cómo se identifica el producto
+## How the product is identified
 
-Cada familia define patrones (expresiones regulares) que se comparan con varias señales. Cada señal suma un peso si coincide:
+Each family defines patterns (regular expressions) that are compared with several signals. Each matching signal adds a weight:
 
-| Señal | Peso | Ejemplo |
+| Signal | Weight | Example |
 | --- | --- | --- |
-| Título compilado del CHM (`#SYSTEM`) | 4 | "GoNow Agent Help" |
-| Nombre del archivo | 3 | `SkyFareHelp.chm` |
-| Título de la página de bienvenida | 2 | "Welcome to Device Manager" |
-| Nombre del archivo de contenido (`.hhc`) | 2 | `SkyScheduleHelp.hhc` |
-| Carpeta de instalación | 1 | `...\Client Suite\Fare Manager` |
+| Compiled CHM title (`#SYSTEM`) | 4 | "GoNow Agent Help" |
+| File name | 3 | `SkyFareHelp.chm` |
+| Welcome page title | 2 | "Welcome to Device Manager" |
+| Contents file name (`.hhc`) | 2 | `SkyScheduleHelp.hhc` |
+| Installation folder | 1 | `...\Client Suite\Fare Manager` |
 
-- Con menos de 3 puntos la ayuda queda como `unknown` y no se convierte (salvo `--include-unknown`).
-- Si la segunda familia queda a menos de 2 puntos, el estado es `ambiguous` y se muestra la alternativa (`runner_up`).
-- La evidencia completa se guarda en `manifest.json → classification.evidence`.
+- Below 3 points the help is `unknown` and is not converted (unless `--include-unknown`).
+- If the second-best family is within 2 points, the status is `ambiguous` and the alternative is shown (`runner_up`).
+- The full evidence is stored in `manifest.json → classification.evidence`.
 
-## Cómo se determina la versión
+## How the version is determined
 
-Nunca se usa el nombre del archivo como versión. Las fuentes, de mayor a menor fiabilidad:
+The file name is never used as a version. Sources, from most to least reliable:
 
-1. **Registro de Windows** (solo lectura): entradas de *Uninstall* de Navitaire/Amadeus cuya `InstallLocation` contiene el CHM. Se toma `DisplayVersion` o, si está vacía, la versión del `DisplayName` (caso de *NewSkies Client Suite*).
-2. **Ejecutable del producto** junto al CHM o en carpetas superiores dentro de la instalación (`GoNow.exe`, `UI.Win.SkySpeed.exe`, `DeviceManager.exe`…), leyendo `ProductVersion`. Se descarta el sufijo de compilación (`+commit`) y se exige que el fabricante sea Navitaire o Amadeus.
-3. **Carpeta con aspecto de versión** (`R9.1`, `9.1.0.100`): solo como versión *inferida*.
+1. **Windows registry** (read-only): Navitaire/Amadeus *Uninstall* entries whose `InstallLocation` contains the CHM. `DisplayVersion` is used or, when empty, the version inside `DisplayName` (as with *NewSkies Client Suite*).
+2. **Product executable** next to the CHM or in parent folders within the installation (`GoNow.exe`, `UI.Win.SkySpeed.exe`, `DeviceManager.exe`…), reading `ProductVersion`. The build suffix (`+commit`) is dropped and the vendor must be Navitaire or Amadeus.
+3. **Version-like folder name** (`R9.1`, `9.1.0.100`): only as an *inferred* version.
 
-| Estado | Significado |
+| Status | Meaning |
 | --- | --- |
-| `confirmed` | Registro y/o ejecutable coinciden. |
-| `inferred` | Solo hay indicios de la ruta. |
-| `conflicting` | Fuentes fiables contradictorias; no se elige ninguna. |
-| `unknown` | Sin evidencia. |
+| `confirmed` | Registry and/or executable agree. |
+| `inferred` | Only path hints are available. |
+| `conflicting` | Reliable sources disagree; none is chosen. |
+| `unknown` | No evidence. |
 
-La **versión que indica la ayuda** (`document_version`) se extrae aparte del archivo de contenido, el título o la página de bienvenida. Es informativa: una ayuda puede mencionar una versión anterior a la de la aplicación con la que se instala.
+The **version stated by the help** (`document_version`) is extracted separately from the contents file, the title or the welcome page. It is informational: a help file may mention an earlier version than the application it is installed with.
 
-## Estructura de la salida
+## Output structure
 
 ```text
 NavitaireHelp/
-├── catalog.md                      # tabla de todas las colecciones (empieza aquí)
-├── catalog.json                    # lo mismo, para herramientas
-└── <familia>/
-    └── <hash-12>/                  # una colección = un CHM distinto
-        ├── README.md               # resumen: producto, versiones, puntos de entrada
-        ├── manifest.json           # metadatos, evidencia, ubicaciones, estadísticas
-        ├── toc.md / toc.json       # tabla de contenido original
-        ├── topics/                 # un .md por tema, con la estructura interna del CHM
-        ├── assets/                 # imágenes y adjuntos referenciados
+├── catalog.md                      # table of all collections (start here)
+├── catalog.json                    # the same, for tools
+└── <family>/
+    └── <hash-12>/                  # one collection = one distinct CHM
+        ├── README.md               # summary: product, versions, entry points
+        ├── manifest.json           # metadata, evidence, locations, statistics
+        ├── toc.md / toc.json       # original table of contents
+        ├── topics/                 # one .md per topic, mirroring the CHM's internal structure
+        ├── assets/                 # referenced images and attachments
         ├── indexes/
-        │   ├── topics.json         # título, ruta, migas de pan, encabezados, palabras clave
-        │   ├── keywords.json       # índice original de palabras clave
+        │   ├── topics.json         # title, path, breadcrumbs, headings, keywords
+        │   ├── keywords.json       # original keyword index
         │   └── keywords.md
         └── diagnostics/
-            ├── links.json          # enlaces rotos, IDs sin resolver, enlaces a otras ayudas
-            └── conversion.json     # colisiones de nombres, temas fallidos, entradas de TOC huérfanas
+            ├── links.json          # broken links, unresolved IDs, links to other help files
+            └── conversion.json     # name collisions, failed topics, orphan TOC entries
 ```
 
-Cada tema empieza con *front matter* YAML:
+Each topic starts with YAML front matter:
 
 ```yaml
 ---
-title: "<título del tema>"
-collection_id: "<familia>-<hash de 12 caracteres>"
-family_id: "<familia>"
-product: "<producto>"
-installed_versions: ["<versión instalada>"]
-document_version: "<versión indicada en la ayuda>"
-source_chm: "<archivo>.chm"
-source_topic: "<ruta interna>.html"
-toc_path: ["<capítulo>", "<título del tema>"]
-keywords: ["<palabra clave del índice original>"]
+title: "<topic title>"
+collection_id: "<family>-<12-character hash>"
+family_id: "<family>"
+product: "<product>"
+installed_versions: ["<installed version>"]
+document_version: "<version stated by the help>"
+source_chm: "<file>.chm"
+source_topic: "<internal path>.html"
+toc_path: ["<chapter>", "<topic title>"]
+keywords: ["<keyword from the original index>"]
 ---
 ```
 
-Detalles de la conversión:
+Conversion details:
 
-- Se elimina la plantilla del visor de ayuda (cabecera, "Send Feedback", pies y copyright repetidos); las secciones plegables con contenido se conservan.
-- Los enlaces internos se reescriben como rutas relativas entre archivos `.md`, incluidos los anclajes (`#seccion`). Se toleran diferencias de mayúsculas, espacios, guiones y guiones bajos.
-- Los enlaces que no se pueden resolver se convierten en texto y se registran en `diagnostics/links.json`. La mayoría son defectos del CHM original (imágenes no incluidas, IDs de tema que la herramienta de autoría no resolvió).
-- Si dos temas producirían el mismo archivo, el segundo se renombra (`__2`) y se registra la colisión.
+- The help viewer template is removed (header, "Send Feedback", repeated footers and copyright); collapsible sections with content are kept.
+- Internal links are rewritten as relative paths between `.md` files, including anchors (`#section`). Differences in case, spaces, hyphens and underscores are tolerated.
+- Links that cannot be resolved become plain text and are recorded in `diagnostics/links.json`. Most are defects in the original CHM (images not included, topic IDs the authoring tool never resolved).
+- If two topics would produce the same file, the second is renamed (`__2`) and the collision is recorded.
 
-## Uso con agentes de IA
+## Using it with AI agents
 
-El repositorio incluye agentes de [Kiro](https://kiro.dev) en `.kiro/agents/`: un especialista por producto y un orquestador que delega en ellos. Para usarlos, convierte la ayuda dentro de la carpeta ignorada `knowledge`:
+The repository includes [Kiro](https://kiro.dev) agents in `.kiro/agents/`: one specialist per product and an orchestrator that delegates to them. To use them, convert the help into the git-ignored `knowledge` folder:
 
 ```powershell
 navhelp convert --output .\knowledge --validate
 ```
 
-La guía completa para crearlos, adaptarlos y probarlos está en [docs/agents.md](docs/agents.md).
+The complete guide to creating, adapting and testing them is in [docs/agents.md](docs/agents.md).
 
-## Solución de problemas
+## Troubleshooting
 
-| Síntoma | Causa y solución |
+| Symptom | Cause and fix |
 | --- | --- |
-| `7-Zip not found` | Instala 7-Zip o indica la ruta con `--seven-zip "D:\Tools\7z.exe"`. |
-| `Output folder ... is inside the Git repository` | Elige una carpeta fuera del repositorio o usa `.\knowledge`. |
-| `Output must not be inside a discovery root` | No escribas dentro de `C:\Program Files (x86)\Navitaire`. |
-| `Root not found` | La raíz no existe en este equipo: usa `--root`. |
-| `Access denied: ...` | Tu usuario no puede leer esa carpeta; se omite y se continúa. |
-| Versión `inferred` o `unknown` | No hay entrada de registro ni ejecutable reconocible. Revisa la evidencia con `navhelp inspect -v`. |
-| Familia `unknown` | CHM no reconocido. Revisa con `inspect -v`; conviértelo con `--include-unknown` o añade la familia. |
-| Muchos enlaces rotos | Revisa `diagnostics/links.json`; normalmente el destino no existe en el CHM original. |
-| Cambios del conversor no aplicados | La colección figura como `unchanged`: usa `--force`. |
-| Texto con caracteres extraños | Codificación no declarada en el HTML original; abre una incidencia con el nombre del tema (sin adjuntar su contenido). |
+| `7-Zip not found` | Install 7-Zip or give its path with `--seven-zip "D:\Tools\7z.exe"`. |
+| `Output folder ... is inside the Git repository` | Choose a folder outside the repository or use `.\knowledge`. |
+| `Output must not be inside a discovery root` | Do not write inside `C:\Program Files (x86)\Navitaire`. |
+| `Root not found` | The root does not exist on this machine: use `--root`. |
+| `Access denied: ...` | Your user cannot read that folder; it is skipped and the walk continues. |
+| Version `inferred` or `unknown` | No registry entry or recognisable executable. Check the evidence with `navhelp inspect -v`. |
+| Family `unknown` | Unrecognised CHM. Check with `inspect -v`; convert it with `--include-unknown` or add the family. |
+| Many broken links | See `diagnostics/links.json`; usually the target does not exist in the original CHM. |
+| Converter changes not applied | The collection is `unchanged`: use `--force`. |
+| Garbled characters | Encoding not declared in the original HTML; open an issue with the topic name (without attaching its content). |
 
-## Desarrollo
+## Development
 
 ```powershell
 python -m pip install -e ".[dev]"
-.\scripts\install-hooks.ps1          # control de seguridad antes de cada commit
-ruff check src tests scripts          # estilo y análisis estático
-pytest                                # pruebas (solo datos sintéticos)
-python scripts\check_repo_safety.py   # control de seguridad manual
+.\scripts\install-hooks.ps1          # safety check before every commit
+ruff check src tests scripts          # style and static analysis
+pytest                                # tests (synthetic data only)
+python scripts\check_repo_safety.py   # manual safety check
 ```
 
-Organización del código (`src/navitaire_help/`):
+Code layout (`src/navitaire_help/`):
 
-| Módulo | Responsabilidad |
+| Module | Responsibility |
 | --- | --- |
-| `cli.py` | Comandos y opciones. |
-| `config.py` | Valores por defecto y archivo TOML. |
-| `discovery.py` | Búsqueda recursiva, exclusiones y hash. |
-| `extraction.py` | Invocación segura de 7-Zip. |
-| `chm_metadata.py` | Lectura de `#SYSTEM`, `.hhc` y `.hhk`. |
-| `families.py` / `classification.py` | Familias conocidas y clasificación por evidencia. |
-| `versioning.py` | Registro, recursos de versión de ejecutables y resolución de versión. |
-| `markdown.py` | Conversión HTML → Markdown y limpieza de plantilla. |
-| `converter.py` | Construcción de una colección: temas, recursos, índices, diagnósticos. |
-| `pipeline.py` | Orquestación, manifiestos y catálogo. |
-| `validate.py` | Validación de la salida. |
-| `safety.py` | Protección de la carpeta de salida y ocultación de rutas. |
+| `cli.py` | Commands and options. |
+| `config.py` | Defaults and TOML file. |
+| `discovery.py` | Recursive search, exclusions and hashing. |
+| `extraction.py` | Safe 7-Zip invocation. |
+| `chm_metadata.py` | Reading `#SYSTEM`, `.hhc` and `.hhk`. |
+| `families.py` / `classification.py` | Known families and evidence-based classification. |
+| `versioning.py` | Registry, executable version resources and version resolution. |
+| `markdown.py` | HTML → Markdown conversion and template cleanup. |
+| `converter.py` | Building a collection: topics, assets, indexes, diagnostics. |
+| `pipeline.py` | Orchestration, manifests and catalog. |
+| `validate.py` | Output validation. |
+| `safety.py` | Output folder protection and path redaction. |
 
-Normas:
+Rules:
 
-- Las pruebas usan **solo fixtures sintéticos**. No añadas nunca contenido real de Navitaire, ni siquiera fragmentos.
-- Al informar un problema, describe el tema por su nombre de archivo; no pegues su contenido.
-- Fija versiones exactas al añadir dependencias.
+- Tests use **synthetic fixtures only**. Never add real Navitaire content, not even fragments.
+- When reporting an issue, refer to the topic by its file name; do not paste its content.
+- Pin exact versions when adding dependencies.
 
-## Licencia y atribución
+## Licence and attribution
 
-Distribuido bajo licencia MIT (ver [LICENSE](LICENSE)). Parte del código deriva de [DTDucas/chm-converter](https://github.com/DTDucas/chm-converter) (MIT); el detalle está en [NOTICE](NOTICE).
+Distributed under the MIT licence (see [LICENSE](LICENSE)). Part of the code derives from [DTDucas/chm-converter](https://github.com/DTDucas/chm-converter) (MIT); details are in [NOTICE](NOTICE).
 
-La licencia cubre únicamente el código de esta herramienta. La documentación de Navitaire que se procesa sigue siendo propiedad de sus titulares y está sujeta a sus condiciones de uso.
+The licence covers only the code of this tool. The Navitaire documentation it processes remains the property of its owners and is subject to their terms of use.
