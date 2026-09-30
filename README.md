@@ -21,10 +21,11 @@ All processing is local. The tool sends nothing to the Internet, and this reposi
 11. [How the product is identified](#how-the-product-is-identified)
 12. [How the version is determined](#how-the-version-is-determined)
 13. [Output structure](#output-structure)
-14. [Using it with AI agents](#using-it-with-ai-agents)
-15. [Troubleshooting](#troubleshooting)
-16. [Development](#development)
-17. [Licence and attribution](#licence-and-attribution)
+14. [MCP server](#mcp-server)
+15. [Using it with AI agents](#using-it-with-ai-agents)
+16. [Troubleshooting](#troubleshooting)
+17. [Development](#development)
+18. [Licence and attribution](#licence-and-attribution)
 
 ---
 
@@ -108,6 +109,12 @@ navhelp --version
 navhelp families
 ```
 
+To query the help from an AI chat through the local MCP server (see [MCP server](#mcp-server)), install the optional extra:
+
+```powershell
+python -m pip install ".[mcp]"
+```
+
 To contribute code, also install the development tools and the safety hook:
 
 ```powershell
@@ -189,6 +196,15 @@ Conversion is **incremental**: if a collection already exists with the same tool
 ### `navhelp validate [FOLDER]`
 
 Checks an output folder: complete manifests, correct topic count, front matter present and consistent with its collection, consistent catalog, and no user profile paths. Broken links in the source and unconfirmed versions are reported as warnings.
+
+### `navhelp mcp`
+
+Runs the local MCP server over stdio (requires the `mcp` extra). It is started by the MCP client (Kiro, VS Code, etc.), not by hand. See [MCP server](#mcp-server).
+
+| Option | Effect |
+| --- | --- |
+| `-k, --knowledge DIR` | Converted folder to serve (default: `conversion.output` from the configuration). |
+| `--allow-convert` | Expose the `convert_help` tool, which writes into that folder. Off by default. |
 
 ### Exit codes
 
@@ -327,11 +343,101 @@ Conversion details:
 - Links that cannot be resolved become plain text and are recorded in `diagnostics/links.json`. Most are defects in the original CHM (images not included, topic IDs the authoring tool never resolved).
 - If two topics would produce the same file, the second is renamed (`__2`) and the collision is recorded.
 
+## MCP server
+
+`navhelp mcp` exposes the converted help, and the navhelp operations, as [Model Context Protocol](https://modelcontextprotocol.io) tools. That lets you search, read, compare and convert from an AI chat. It is a local stdio process. It opens no port and makes no network calls.
+
+| Tool | Kind | What it does |
+| --- | --- | --- |
+| `list_collections` | read | Collections with family, product and installed versions. `version="latest"` keeps the highest per family. |
+| `search_topics` | read | Ranked full-text search (SQLite FTS5) over titles, headings, keywords, breadcrumbs and body. Filters: `family`, `version` (prefix or `latest`), `collection_id`. Supports `"phrases"` and `prefix*`. |
+| `get_topic` | read | One topic as Markdown with its metadata. Accepts a citation, `topics/x.md` or the original `x.html`. Can return one `section`. Long topics are paged (`next_offset`). |
+| `get_toc` | read | Original table of contents, or the subtree `under` an entry (`"Tasks > Boarding"`). |
+| `lookup_keyword` | read | Original CHM keyword index (F1 index). |
+| `compare_topic` | read | Unified diff of the same topic across installed versions. |
+| `get_asset` | read | Returns a referenced image so the model can see it. |
+| `scan_installations` | read | Same as `navhelp scan`. |
+| `inspect_installations` | read | Same as `navhelp inspect`; `evidence=true` adds the reasons. |
+| `rebuild_search_index` | cache | Rebuilds the search cache. This is rarely needed because it rebuilds itself when the catalog changes. |
+| `convert_help` | write | Same as `navhelp convert --validate`, into the served folder only. Only exposed with `--allow-convert`. |
+
+Every result carries a `citation` (`<family>/<hash>/topics/...md`) and the collection's `installed_versions`.
+
+### Setting it up
+
+1. Install the extra: `python -m pip install ".[mcp]"`.
+2. Convert the help: `navhelp convert --output .\knowledge --validate` (or later, `convert_help` from the chat).
+3. The agents in `.kiro/agents/` already start the server themselves (see [docs/agents.md](docs/agents.md)). Nothing else is needed for them.
+4. **Manual step: register the server for Kiro's default chat.** This is only needed if you want to use the tools outside the `navitaire-*` agents. Create `.kiro/settings/mcp.json` in the repository folder with the content below, or copy the example:
+
+   ```powershell
+   New-Item -ItemType Directory -Force .kiro\settings | Out-Null
+   Copy-Item config\mcp.example.json .kiro\settings\mcp.json
+   ```
+
+   `.kiro/settings/mcp.json` must contain:
+
+   ```json
+   {
+     "mcpServers": {
+       "navhelp": {
+         "command": ".venv\\Scripts\\navhelp.exe",
+         "args": ["mcp", "--knowledge", "./knowledge", "--allow-convert"],
+         "disabled": false,
+         "autoApprove": [
+           "list_collections",
+           "search_topics",
+           "get_topic",
+           "get_toc",
+           "lookup_keyword",
+           "compare_topic",
+           "get_asset",
+           "scan_installations",
+           "inspect_installations"
+         ]
+       }
+     }
+   }
+   ```
+
+   | Field | Value and why |
+   | --- | --- |
+   | `navhelp` | Server name. Keep it: the agents' permission rules match `navhelp/*`. |
+   | `command` | `navhelp.exe` from the repository's virtual environment. JSON needs doubled backslashes. |
+   | `args` | `mcp` subcommand, the folder to serve (`--knowledge`) and `--allow-convert` to expose `convert_help`. Remove `--allow-convert` for a strictly read-only server. |
+   | `disabled` | `false` to start the server. Set `true` to turn it off without deleting the entry. |
+   | `autoApprove` | Read-only tools that run without asking. `convert_help` and `rebuild_search_index` are left out on purpose, so Kiro asks before each call. Do not use `"*"`. |
+
+   If the file already exists with other servers, add only the `"navhelp": { ... }` entry inside `mcpServers`; do not overwrite it.
+
+5. Check it: open the **MCP Servers** view in the Kiro panel. `navhelp` should show as connected with 11 tools (10 without `--allow-convert`). Then ask in chat, for example: *"Use navhelp list_collections"*. If it fails, the view shows the server log. Kiro reloads the file when you save it.
+
+**Absolute paths.** The relative paths above assume Kiro starts the server from the repository folder. If the server does not start, or reports that `catalog.json` is missing, use absolute paths:
+
+```json
+"command": "C:\\<path>\\navitaire-help-exporter\\.venv\\Scripts\\navhelp.exe",
+"args": ["mcp", "--knowledge", "C:\\<path>\\navitaire-help-exporter\\knowledge", "--allow-convert"]
+```
+
+An `mcp.json` with absolute paths under your profile (`C:\Users\<you>\...`) is machine-specific. Do not commit it: the safety check blocks profile paths. Keep the relative version in Git, or put the absolute one in your user configuration (`~/.kiro/settings/mcp.json`), which applies to every workspace. The same change applies to the `mcpServers` block of each agent in `.kiro/agents/`.
+
+For other MCP clients (VS Code, Claude Desktop…) use the same `command` and `args` with absolute paths, in the format that client expects.
+
+### Security
+
+- Every path argument is confined to its collection folder. Traversal (`..`), absolute paths and other folders are rejected. `get_asset` only serves files under `assets/`.
+- Search queries are turned into quoted FTS5 terms, so the query language cannot be abused.
+- `convert_help` is off unless `--allow-convert` is given. It can only write into the served folder and applies the same checks as `navhelp convert`: never inside an installation root, and never inside Git unless git-ignored.
+- User profile paths are redacted from results.
+- The search cache lives in `<knowledge>\.navhelp-index\`, inside the git-ignored folder. If the folder is read-only, the index is kept in memory.
+- Whatever the tools return reaches the language model you use, exactly as with the agents' knowledge bases. Use only models and clients approved for this documentation.
+
 ## Using it with AI agents
 
-The repository includes [Kiro](https://kiro.dev) agents in `.kiro/agents/`: one specialist per product and an orchestrator that delegates to them. To use them, convert the help into the git-ignored `knowledge` folder:
+The repository includes [Kiro](https://kiro.dev) agents in `.kiro/agents/`: one specialist per product and an orchestrator that delegates to them. Specialists research through the MCP server's read-only tools, with the knowledge base as a fallback. The orchestrator can also scan, inspect and, with confirmation, convert. To use them, convert the help into the git-ignored `knowledge` folder and install the `mcp` extra:
 
 ```powershell
+python -m pip install ".[mcp]"
 navhelp convert --output .\knowledge --validate
 ```
 
@@ -350,6 +456,9 @@ The complete guide to creating, adapting and testing them is in [docs/agents.md]
 | Family `unknown` | Unrecognised CHM. Check with `inspect -v`; convert it with `--include-unknown` or add the family. |
 | Many broken links | See `diagnostics/links.json`; usually the target does not exist in the original CHM. |
 | Converter changes not applied | The collection is `unchanged`: use `--force`. |
+| `the MCP extra is not installed` | `python -m pip install ".[mcp]"`. |
+| MCP server does not start in Kiro | Check the MCP panel logs. If the server was started from another folder, use absolute paths in `command` and `--knowledge`. |
+| MCP search results look stale | Call `rebuild_search_index` or delete `knowledge\.navhelp-index`. |
 | Garbled characters | Encoding not declared in the original HTML; open an issue with the topic name (without attaching its content). |
 
 ## Development
@@ -377,6 +486,8 @@ Code layout (`src/navitaire_help/`):
 | `converter.py` | Building a collection: topics, assets, indexes, diagnostics. |
 | `pipeline.py` | Orchestration, manifests and catalog. |
 | `validate.py` | Output validation. |
+| `knowledge.py` | Read-only query engine over a converted folder (catalog, FTS5 search, topics, TOC, keywords, diffs). |
+| `mcp_server.py` | MCP server (`navhelp mcp`) exposing `knowledge.py` and the navhelp operations. |
 | `safety.py` | Output folder protection and path redaction. |
 
 Rules:
