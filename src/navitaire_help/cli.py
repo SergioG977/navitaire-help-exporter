@@ -186,6 +186,19 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return EXIT_OK if report.ok else EXIT_ERROR
 
 
+def cmd_mcp(args: argparse.Namespace) -> int:
+    try:
+        from .mcp_server import MCPServer, run
+    except ImportError as exc:  # pragma: no cover
+        raise ConfigError(f"MCP server unavailable: {exc}") from exc
+    if MCPServer is None:
+        _print('error: the MCP extra is not installed. Run: python -m pip install ".[mcp]"', err=True)
+        return EXIT_USAGE
+    settings = _settings(args)
+    knowledge = Path(args.knowledge).expanduser() if args.knowledge else settings.output.expanduser()
+    return run(knowledge.resolve(), args.config, args.allow_convert)
+
+
 # --------------------------------------------------------------------------- parser
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -235,6 +248,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("path", nargs="?", help="output folder (default from configuration)")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_validate)
+
+    p = sub.add_parser("mcp", parents=[common], help="run the local MCP server (stdio) over a converted folder")
+    p.add_argument("-k", "--knowledge", metavar="DIR",
+                   help="converted output folder to serve (default: conversion.output from the configuration)")
+    p.add_argument("--allow-convert", action="store_true",
+                   help="expose the convert_help tool, which writes into the knowledge folder")
+    p.set_defaults(func=cmd_mcp)
     return parser
 
 

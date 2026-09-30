@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "navhelp": {
+      "command": ".venv\\Scripts\\navhelp.exe",
+      "args": ["mcp", "--knowledge", "./knowledge", "--allow-convert"],
+      "disabled": false,
+      "autoApprove": [
+        "list_collections",
+        "search_topics",
+        "get_topic",
+        "get_toc",
+        "lookup_keyword",
+        "compare_topic",
+        "get_asset",
+        "scan_installations",
+        "inspect_installations"
+      ]
+    }
+  }
+}
